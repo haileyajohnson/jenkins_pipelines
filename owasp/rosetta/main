@@ -20,7 +20,14 @@ pipeline {
         stage('Scan Dependencies') {
             steps {
                 dependencyCheck additionalArguments: '--format HTML --format XML --suppression project-files/owasp-dependency-check/dependency-check-suppression.xml', odcInstallation: 'OWASP', stopBuild: true
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml' 
+                step([
+                    $class:                 'DependencyCheckPublisher',
+                    pattern:                '**/dependency-check-report.xml', 
+                    failedTotalCritical:    1,
+                    failedTotalHigh:        1,
+                    failedTotalLow:         1,
+                    failedTotalMedium:      1
+                ])
             }
         }
         stage('Publish Report') {
