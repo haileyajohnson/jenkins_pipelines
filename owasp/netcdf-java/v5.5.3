@@ -2,7 +2,7 @@ pipeline {
     agent  { label 'jenkins-worker' } 
     environment {
         JAVA_HOME = "/usr/thredds-test-environment/temurin11"
-        TO = "hajohns@ucar.edu,oxelson@ucar.edu"
+        TO = "thredds-developers@unidata.ucar.edu"
         JOB = "Jenkins build #${env.BUILD_NUMBER} for ${env.JOB_NAME}"
         BUILD_URL ="${env.BUILD_URL}"
     }
