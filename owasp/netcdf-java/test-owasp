@@ -11,8 +11,8 @@ pipeline {
             steps {
                 checkout([
                     $class                           : 'GitSCM',
-                    branches                         : [[name: "refs/tags/v5.5.3"]],
-                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/Unidata/netcdf-java']],
+                    branches                         : [[name: "*/test-owasp"]],
+                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/haileyajohnson/netcdf-java']],
                     doGenerateSubmoduleConfigurations: false
                 ])
             }
