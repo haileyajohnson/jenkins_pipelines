@@ -17,6 +17,16 @@ pipeline {
                 ])
             }
         }
+        stage('Assemble Project') {
+            steps {
+                sh '''
+                   #!/bin/bash
+                   select-java temurin 11
+                   chmod u+x gradlew
+                   ./gradlew assemble
+                '''
+            }
+        }
         stage('Scan Dependencies') {
             steps {
                 dependencyCheck additionalArguments: '--format HTML --format XML --suppression project-files/owasp-dependency-check/dependency-check-suppression.xml', odcInstallation: 'OWASP', stopBuild: true
@@ -34,8 +44,7 @@ pipeline {
             steps {
                 sh '''
                     #!/bin/bash
-                    if [ ! -d build ]; then
-                        mkdir build
+                    if [ ! -d build/reports ]; then
                         mkdir build/reports/
                     fi
                     mv dependency-check-report.* build/reports/
