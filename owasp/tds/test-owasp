@@ -11,8 +11,8 @@ pipeline {
             steps {
                 checkout([
                     $class                           : 'GitSCM',
-                    branches                         : [[name: "*/main"]],
-                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/Unidata/tds']],
+                    branches                         : [[name: "*/jakarta-namespace"]],
+                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/haileyajohnson/tds']],
                     doGenerateSubmoduleConfigurations: false
                 ])
             }
