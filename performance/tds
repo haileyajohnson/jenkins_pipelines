@@ -1,0 +1,90 @@
+pipeline {
+    agent  { label 'ml11sshnode' } 
+    environment {
+        JAVA_HOME = "/opt/jdk"
+        TO = "thredds-developers@unidata.ucar.edu"
+        JOB = "Jenkins build #${env.BUILD_NUMBER} for ${env.JOB_NAME}"
+        BUILD_URL ="${env.BUILD_URL}"
+    }
+    stages {
+        stage('Verify Docker Availability') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    if [ -z "$(pgrep docker)" ]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                '''
+            }
+        }
+        stage('Verify Telegraf Availability') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    if [ -z "$(pgrep telegraf)" ]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                '''
+            }
+        }
+        stage('Checkout From GitHub') {
+            steps {
+                checkout([
+                    $class                           : 'GitSCM',
+                    branches                         : [[name: "*/main"]],
+                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/Unidata/thredds-performance-tests']],
+                    doGenerateSubmoduleConfigurations: false
+                ])
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    echo "DATA_DIR=/opt/jenkins/thredds-performance-tests" > tds/.env
+                    ./run-all.sh
+                '''
+            }
+        }
+        stage('Trigger Telegraf') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    if [ -f tests/results/results.csv ]; then
+                        telegraf -once -config /opt/jenkins/telegraf-tdspt.conf
+                    fi
+                '''
+            }
+        }
+        stage('Display Run Log') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    pwd
+                    if [ -f tests/results/run.log ]; then
+                        echo "\n\n############# LOG FILE ##############\n\n"
+                        cat tests/results/run.log
+                    fi
+                '''
+            }
+        }
+    }
+    post {  
+        always {  
+            echo "Build complete: ${currentBuild.currentResult}"  
+        }  
+        failure {  
+            mail to: "${TO}", subject: "${JOB} FAILED", body: "${JOB} FAILED\n See: ${BUILD_URL}"
+        }  
+        unstable {  
+            mail to: "${TO}", subject: "${JOB} UNSTABLE", body: "${JOB} UNSTABLE\n See: ${BUILD_URL}"
+        }  
+        changed {  
+            script {
+                if ("${currentBuild.currentResult}" == "SUCCESS") {
+                    mail to: "${TO}", subject: "${JOB} STABLE", body: "${JOB} STABLE\n Build status back to normal."
+                }
+            }
+        }   
+    }
+}
