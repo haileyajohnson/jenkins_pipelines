@@ -61,7 +61,6 @@ pipeline {
                 sh '''
                     #!/bin/bash
                     if [ -f tests/results/run.log ]; then
-                        ############## PRINT LOG FILE ##############
                         cat tests/results/run.log
                     fi
                 '''
