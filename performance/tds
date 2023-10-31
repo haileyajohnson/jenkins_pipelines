@@ -60,10 +60,21 @@ pipeline {
             steps {
                 sh '''
                     #!/bin/bash
-                    pwd
                     if [ -f tests/results/run.log ]; then
                         echo "\n\n############# LOG FILE ##############\n\n"
                         cat tests/results/run.log
+                    fi
+                '''
+            }
+        }
+    }
+    stage('Cleanup') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    pwd
+                    if [ -f tests/results/run.log ]; then
+                        rm -rf README.md  run-all.sh  tds  tests
                     fi
                 '''
             }
