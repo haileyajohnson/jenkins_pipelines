@@ -17,16 +17,6 @@ pipeline {
                 '''
             }
         }
-        stage('Verify Telegraf Availability') {
-            steps {
-                sh '''
-                    #!/bin/bash
-                    if [ -z "$(pgrep telegraf)" ]; then
-                        currentBuild.result = 'FAILURE'
-                    fi
-                '''
-            }
-        }
         stage('Checkout From GitHub') {
             steps {
                 checkout([
