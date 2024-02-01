@@ -64,6 +64,7 @@ pipeline {
                     if [ -f tests/results/run.log ]; then
                         rm -rf README.md  run-all.sh  tds  tests
                     fi
+                    docker system prune -a -f
                 '''
             }
         }
