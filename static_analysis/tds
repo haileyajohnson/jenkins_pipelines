@@ -1,0 +1,144 @@
+pipeline {
+    agent  { label 'jenkins-worker' } 
+    environment {
+        JAVA_HOME = "/usr/thredds-test-environment/temurin11"
+        TO = "thredds-developers@unidata.ucar.edu"
+        JOB = "Jenkins build #${env.BUILD_NUMBER} for ${env.JOB_NAME}"
+        BUILD_URL ="${env.BUILD_URL}"
+        COV_PROJECT = "Unidata%2Ftds"
+        PAYLOAD = "Unidata_tds.tgz"
+        BUILD_TOOL_VERSION = "2023.6.2"
+        COV_DIR = "cov-analysis-linux64-${BUILD_TOOL_VERSION}"
+        WAR_PATH = "build/downloads/thredds-5.5-SNAPSHOT.war"
+    }
+    stages {
+        stage('Fetch project from GitHub') {
+            steps {
+                checkout([
+                    $class                           : 'GitSCM',
+                    branches                         : [[name: "*/main"]],
+                    userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/Unidata/tds']],
+                    doGenerateSubmoduleConfigurations: false
+                ])
+            }
+        }
+        stage('Get build tool') {
+            steps {
+                withCredentials([string(credentialsId: 'TDS_COVERITY', variable: 'TOKEN')]) {
+                    sh '''
+                        #!/bin/bash
+                        rm -rf cov-analysis*
+                        curl -d "token=${TOKEN}&project=${COV_PROJECT}" -X POST https://scan.coverity.com/download/linux64 -o cov-analysis.tgz
+                        if [[ ! -f cov-analysis.tgz ]]; then
+                            currentBuild.result = 'FAILURE'
+                        else
+                            tar xfz cov-analysis.tgz
+                            if [[ ! -d ${COV_DIR} ]]; then
+                                currentBuild.result = 'FAILURE'
+                            fi
+                        fi
+                    '''
+                }
+            }
+        }
+        stage('Build project') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    ./gradlew --no-daemon clean
+                    PATH=${COV_DIR}/bin:$PATH
+                    cov-build --dir ${COV_DIR}/cov-int ./gradlew --no-daemon assemble
+                    if [[ ! -f ${COV_DIR}/cov-int/build-log.txt ]]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                    SUCCESS=$(tail -n 1 ${COV_DIR}/cov-int/build-log.txt | grep "completed successfully")
+                    if [[ -z "${SUCCESS}" ]]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                '''
+            }
+        }
+        stage('Scan WAR file') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    PATH=${COV_DIR}/bin:$PATH
+                    if [[ ! -f ${WAR_PATH} ]]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                    cov-emit-java --dir ${COV_DIR}/cov-int --war ${WAR_PATH}
+                    SUCCESS=$(tail -n 1 ${COV_DIR}/cov-int/build-log.txt | grep "completed successfully")
+                    if [[ -z "${SUCCESS}" ]]; then
+                        currentBuild.result = 'FAILURE'
+                    fi
+                '''
+            }
+        }
+        stage('Prep results') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    cd ${COV_DIR}
+                    if [[ -f ${PAYLOAD} ]]; then
+                        rm ${PAYLOAD}
+                    fi
+                    tar cfz ${PAYLOAD} cov-int
+                    if [[ ! -f ${PAYLOAD} ]]; then
+                        currentBuild.result = 'FAILURE'
+                    else 
+                        ls -lh ${PAYLOAD} 
+                    fi
+                '''
+            }
+        }
+        stage('Upload results') {
+            steps {
+                withCredentials([string(credentialsId: 'TDS_COVERITY', variable: 'TOKEN'), string(credentialsId: 'COVERITY_USER', variable: 'EMAIL')]) {
+                    sh '''
+                        #!/bin/bash
+                        PROJECT_VERSION=$(./gradlew --no-daemon properties -q | grep "^version:" | awk '{print $2}')
+                        PROJECT_DESCRIPTION=$(./gradlew --no-daemon properties -q | grep "^description:" | awk '{print $2}')
+                        PROJECT_GIT_BRANCH=$(git branch | awk '{print $2}')
+                        PROJECT_GIT_HASH=$(git log --pretty=format:'%h' -n 1)
+                        COV_DESCRIPTION="${PROJECT_DESCRIPTION} branch: main commit: ${PROJECT_GIT_HASH}"
+                        cd ${COV_DIR}
+                        set +x
+                        curl --form token=${TOKEN} \
+                        --form email=${EMAIL} \
+                        --form file=@${PAYLOAD} \
+                        --form version="${PROJECT_VERSION}" \
+                        --form description="${COV_DESCRIPTION}" \
+                        https://scan.coverity.com/builds?project=${COV_PROJECT}
+                        set -x
+                '''
+                }
+            }
+        }
+        stage('Clean up') {
+            steps {
+                sh '''
+                    #!/bin/bash
+                    rm -rf *
+                '''
+            }
+        }
+    }
+    post {  
+        always {  
+            echo "Build complete: ${currentBuild.currentResult}"  
+        }  
+        failure {  
+            mail to: "${TO}", subject: "${JOB} FAILED", body: "${JOB} FAILED\n See: ${BUILD_URL}"
+        }  
+        unstable {  
+            mail to: "${TO}", subject: "${JOB} UNSTABLE", body: "${JOB} UNSTABLE\n See: ${BUILD_URL}"
+        }  
+        changed {  
+            script {
+                if ("${currentBuild.currentResult}" == "SUCCESS") {
+                    mail to: "${TO}", subject: "${JOB} STABLE", body: "${JOB} STABLE\n Build status back to normal."
+                }
+            }
+        }   
+    }
+}
