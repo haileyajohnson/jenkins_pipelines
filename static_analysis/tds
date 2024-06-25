@@ -7,7 +7,7 @@ pipeline {
         BUILD_URL ="${env.BUILD_URL}"
         COV_PROJECT = "Unidata%2Ftds"
         PAYLOAD = "Unidata_tds.tgz"
-        BUILD_TOOL_VERSION = "2023.6.2"
+        BUILD_TOOL_VERSION = "2023.12.2"
         COV_DIR = "cov-analysis-linux64-${BUILD_TOOL_VERSION}"
         WAR_PATH = "build/downloads/thredds-5.5-SNAPSHOT.war"
     }
