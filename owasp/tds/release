@@ -11,7 +11,7 @@ pipeline {
             steps {
                 checkout([
                     $class                           : 'GitSCM',
-                    branches                         : [[name: "refs/tags/v5.4"]],
+                    branches                         : [[name: "refs/tags/v5.5"]],
                     userRemoteConfigs                : [[credentialsId: 'user', url: 'https://github.com/Unidata/tds']],
                     doGenerateSubmoduleConfigurations: false
                 ])
